@@ -3,16 +3,44 @@
     "step": {
       "user": {
         "title": "Eufy NVR (local)",
-        "description": "Point this at the machine running the bridge's go2rtc. Streams are the go2rtc stream names from bridge/go2rtc.yaml.",
+        "description": "Point this at the go2rtc instance run by the Eufy NVR add-on or bridge. Cameras are discovered automatically from its eufy_* streams — you do not enter channel names. Use 127.0.0.1 if the add-on runs on this Home Assistant host.",
         "data": {
-          "host": "Bridge host (IP)",
-          "port": "RTSP port",
-          "streams": "Stream names (comma-separated)"
+          "host": "go2rtc host (IP)",
+          "api_port": "go2rtc API port",
+          "rtsp_port": "RTSP port"
+        },
+        "data_description": {
+          "host": "IP or hostname of the machine running the bridge/add-on (default 127.0.0.1 for the add-on).",
+          "api_port": "go2rtc REST API / web UI port (default 1984), used to auto-discover cameras.",
+          "rtsp_port": "Port go2rtc serves RTSP on (default 8554), used to stream each camera."
+        }
+      },
+      "reconfigure": {
+        "title": "Eufy NVR (local)",
+        "description": "Update where go2rtc is reachable. Cameras re-discover automatically after saving.",
+        "data": {
+          "host": "go2rtc host (IP)",
+          "api_port": "go2rtc API port",
+          "rtsp_port": "RTSP port"
         }
       }
     },
+    "error": {
+      "cannot_connect": "Could not reach go2rtc at that host/port. Check that the Eufy NVR add-on or bridge is running and the go2rtc API port is correct."
+    },
     "abort": {
-      "already_configured": "This bridge is already configured."
+      "already_configured": "This go2rtc endpoint is already configured.",
+      "reconfigure_successful": "Eufy NVR was reconfigured successfully."
+    }
+  },
+  "entity": {
+    "camera": {
+      "eufy_nvr": {
+        "state_attributes": {
+          "stream_name": { "name": "Stream name" },
+          "stream_source": { "name": "Stream source" }
+        }
+      }
     }
   }
 }

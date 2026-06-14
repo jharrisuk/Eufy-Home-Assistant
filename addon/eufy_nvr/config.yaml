@@ -1,38 +1,77 @@
 name: Eufy NVR Local (experimental)
-version: "0.2.0"
+version: "0.3.0"
 slug: eufy_nvr
 description: Local live video from a eufy PoE NVR (S4 / T8N00) over reversed WebRTC, served as RTSP/WebRTC for Home Assistant. No cloud media, no Frigate.
 url: https://github.com/HallyAus/Eufy-Home-Assistant
+codenotary: notarize@home-assistant.io
 arch:
   - aarch64
   - amd64
+init: false
+# "application" = long-running service that HA keeps up; pairs with the watchdog below.
 startup: application
 boot: manual
-init: false
-host_network: true            # needs LAN access to the NVR and to serve RTSP/WebRTC to HA
+
+# host_network is REQUIRED: the engine talks LAN-direct to the NVR (WebRTC media + UDP), and
+# go2rtc must be reachable on the HA host itself at rtsp://127.0.0.1:8554 by the Generic Camera /
+# HA's own go2rtc. With host_network the ports below are informational (no NAT is applied), but we
+# keep them so the Supervisor UI documents what the add-on opens.
+host_network: true
 hassio_api: true
 homeassistant_api: true
+
+# Watchdog: Supervisor pings this TCP endpoint; if go2rtc's API stops answering, the add-on is
+# restarted. run.sh ALSO has its own supervise loop (restart-on-crash) so transient engine
+# failures recover in-process without a full container bounce.
+watchdog: "tcp://[HOST]:1984"
+
+# Ingress points the "Open Web UI" button at go2rtc's built-in UI (stream list + WebRTC test player).
+ingress: false
+panel_icon: mdi:cctv
+webui: "http://[HOST]:1984/"
+
 ports:
   8554/tcp: 8554
   1984/tcp: 1984
   8555/tcp: 8555
   8555/udp: 8555
 ports_description:
-  8554/tcp: RTSP (HA pulls cameras from here)
-  1984/tcp: go2rtc API / web UI
-  8555/tcp: WebRTC (TCP)
-  8555/udp: WebRTC (UDP)
-# Auth — v0.2 uses a session token (run bridge/get_auth.js once on any PC, paste the values here).
-# Roadmap v0.3: email/password headless login so none of this is needed.
+  8554/tcp: RTSP (HA pulls cameras from rtsp://127.0.0.1:8554/eufy_<name>)
+  1984/tcp: go2rtc API / web UI (also the watchdog endpoint)
+  8555/tcp: WebRTC (TCP candidate)
+  8555/udp: WebRTC (UDP candidate)
+
+# --- Auth (v0.3) ---------------------------------------------------------------
+# Still a one-time session token: run bridge/get_auth.js once on any PC, paste the values here.
+# The token only signs the eufy cloud *signaling*; the video itself is pulled LAN-direct.
+# Re-paste if streams stop starting and the log shows ws/sign returning non-200 (token expired).
 options:
   auth_token: ""
   gtoken: ""
   user_id: ""
   station_sn: ""
   region: "US"
+  log_level: "info"
 schema:
   auth_token: str
   gtoken: str
   user_id: str
   station_sn: str
   region: list(US|EU)?
+  log_level: list(trace|debug|info|notice|warning|error|fatal)?
+
+# --- Roadmap v0.4: headless email/password login (no token paste) --------------
+# When the pure-Python eufy passport login lands, the block above is replaced by the two fields
+# below (email + password), and run.sh derives auth_token/gtoken/user_id/station_sn itself.
+# Kept here, commented, so the schema/UX is ready to switch over:
+#
+# options:
+#   email: ""
+#   password: ""
+#   region: "US"
+#   log_level: "info"
+# schema:
+#   email: email
+#   password: password
+#   region: list(US|EU)?
+#   log_level: list(trace|debug|info|notice|warning|error|fatal)?

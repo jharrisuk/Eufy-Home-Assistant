@@ -1,11 +1,12 @@
 {
   "domain": "eufy_nvr",
   "name": "Eufy NVR (local)",
-  "version": "0.1.1",
+  "version": "0.3.0",
   "documentation": "https://github.com/HallyAus/Eufy-Home-Assistant",
   "issue_tracker": "https://github.com/HallyAus/Eufy-Home-Assistant/issues",
   "codeowners": ["@HallyAus"],
   "config_flow": true,
+  "dependencies": ["ffmpeg"],
   "iot_class": "local_polling",
   "integration_type": "hub",
   "requirements": []
