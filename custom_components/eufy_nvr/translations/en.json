@@ -1,0 +1,18 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Eufy NVR (local)",
+        "description": "Point this at the machine running the bridge's go2rtc. Streams are the go2rtc stream names from bridge/go2rtc.yaml.",
+        "data": {
+          "host": "Bridge host (IP)",
+          "port": "RTSP port",
+          "streams": "Stream names (comma-separated)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This bridge is already configured."
+    }
+  }
+}

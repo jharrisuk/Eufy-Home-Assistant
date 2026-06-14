@@ -1,0 +1,21 @@
+# go2rtc on the bridge host — on-demand RTSP server fronting the eufy WebRTC bridge.
+# Each stream execs eufy_stream.py for one NVR channel only while a client is pulling it.
+# Home Assistant's go2rtc (on a different host) then pulls rtsp://THIS_HOST:8554/eufy_<name>.
+#
+# {output} is replaced by go2rtc with an internal RTSP ingest URL; eufy_stream.py spawns ffmpeg to publish there.
+# Adjust the python path / channel numbers / names to taste. Channels are 0..3.
+
+streams:
+  eufy_garage: "exec:python eufy_stream.py 0 --rtsp {output}"
+  eufy_ch1:    "exec:python eufy_stream.py 1 --rtsp {output}"
+  eufy_ch2:    "exec:python eufy_stream.py 2 --rtsp {output}"
+  eufy_ch3:    "exec:python eufy_stream.py 3 --rtsp {output}"
+
+rtsp:
+  listen: ":8554"
+
+api:
+  listen: ":1984"
+
+log:
+  level: info

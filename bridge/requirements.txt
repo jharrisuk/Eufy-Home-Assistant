@@ -1,0 +1,5 @@
+aiortc>=1.9
+av
+websockets>=12
+aiohttp
+pycryptodome

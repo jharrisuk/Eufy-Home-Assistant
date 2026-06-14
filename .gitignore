@@ -1,0 +1,27 @@
+# Secrets — NEVER commit. These hold your eufy session token / account id.
+bridge/auth.json
+bridge/auth.local.json
+**/user_id.txt
+**/userdata/
+secrets.yaml
+
+# Downloaded binaries / vendored eufy WASM (fetched by fetch_deps.js)
+bridge/bin/
+bridge/worker/
+*.exe
+*.zip
+*.wasm
+
+# Runtime / debug output
+bridge/_debug/
+*.log
+*.bin
+go2rtc.local.yaml
+
+# Python / Node / editor
+__pycache__/
+*.pyc
+node_modules/
+.DS_Store
+.idea/
+.vscode/
