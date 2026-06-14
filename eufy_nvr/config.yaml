@@ -56,7 +56,7 @@ options:
   region: "US"
   log_level: "info"
 schema:
-  email: email
+  email: str
   password: password
   region: list(US|EU)?
   log_level: list(trace|debug|info|notice|warning|error|fatal)?
