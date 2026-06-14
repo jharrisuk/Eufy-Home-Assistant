@@ -37,7 +37,6 @@ _RTCCert._create_ssl_context = _broad_ssl_ctx
 
 ROOT = os.path.dirname(os.path.abspath(__file__))   # the bridge/ directory
 def _bin(name):
-    """Locate a tool: bridge/bin/<name>[.exe], else env override, else bare name on PATH."""
     exe = name + (".exe" if os.name == "nt" else "")
     local = os.path.join(ROOT, "bin", exe)
     return os.environ.get(name.upper(), local if os.path.exists(local) else name)
@@ -46,15 +45,13 @@ AUTH = json.load(open(os.environ.get("EUFY_AUTH", os.path.join(ROOT, "auth.json"
 STATION_SN = os.environ.get("EUFY_STATION_SN") or AUTH.get("stationSn") or "T8N005102610052C"
 
 def _decrypt_user_id():
-    """user_id = AES-decrypt(localStorage 'auid', passphrase 'aes', OpenSSL EVP_BytesToKey/MD5)."""
     if AUTH.get("userId"):
         return AUTH["userId"]
     auid = AUTH.get("auid")
     if not auid:
         raise SystemExit("auth.json has no 'userId' or 'auid' — re-run get_auth.js")
     from Crypto.Cipher import AES
-    inner = base64.b64decode(auid).decode("utf-8")
-    blob = base64.b64decode(inner)
+    blob = base64.b64decode(base64.b64decode(auid).decode("utf-8"))
     salt, ct = blob[8:16], blob[16:]
     d = b""; prev = b""
     while len(d) < 48:
@@ -62,8 +59,8 @@ def _decrypt_user_id():
     pt = AES.new(d[:32], AES.MODE_CBC, d[32:48]).decrypt(ct)
     return json.loads(pt[:-pt[-1]])
 USER_ID = _decrypt_user_id()
-
-_carg = sys.argv[1] if len(sys.argv) > 1 else "0"
+DISCOVER = "--discover" in sys.argv   # connect, run cmd 9100 -> list NVR ip + cameras (ch,name), write cameras.json, exit
+_carg = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else "0"
 CHANNELS = [0, 1, 2, 3] if _carg == "all" else [int(x) for x in _carg.split(",")]
 # --rtsp <url>: publish the H.265 stream to that RTSP url via ffmpeg (go2rtc exec {output} mode).
 RTSP_URL = None
@@ -89,6 +86,7 @@ HEADERS = {
 os.makedirs(os.path.join(ROOT, "_debug"), exist_ok=True)
 VIDEO_DUMP = os.path.join(ROOT, "_debug", "video_dump.bin")
 FRAMES_LOG = os.path.join(ROOT, "_debug", "frames.jsonl")
+CAMERAS_JSON = os.path.join(ROOT, "cameras.json")
 
 STDOUT_MODE = os.environ.get("EUFY_STDOUT") == "1"   # write clean Annex-B to stdout (for go2rtc/ffmpeg exec source)
 def now(): return int(time.time())
@@ -126,6 +124,17 @@ def build_startstream(user_id, channels, stream_id=1):
     h[14] = stream_id & 0xFF                      # isResponse byte carries streamId (per pr cloud branch)
     h[15] = 2
     return bytes(h) + payload
+
+def build_cmd(user_id, cmd, payload=None, channel_id=255):
+    body = json.dumps({"account_id": user_id, "cmd": cmd, "payload": payload or {}}, separators=(",", ":")).encode()
+    h = bytearray(16); h[0:4] = b"XZYH"
+    struct.pack_into("<H", h, 4, 1350)
+    struct.pack_into("<I", h, 6, len(body))
+    h[12] = channel_id & 0xFF; h[15] = 2
+    return bytes(h) + body
+
+def build_devicelist(user_id):
+    return build_cmd(user_id, 9100, {})   # response payload.dev_list = [{ch,sn,name,status,...}] (auto-discovery)
 
 def build_ping():
     # heartbeat: 20-byte struct + 16-byte XZYH(1139), sent RAW (type Ir=99), per the web client.
@@ -266,7 +275,7 @@ async def main():
     pc = RTCPeerConnection(RTCConfiguration(iceServers=[]))
     chans = {}
     state = {"connected": False, "started": False, "vbytes": 0, "vframes": 0, "ptcs_in": 0,
-             "cmd_dc_open": False, "frames_seen": 0}
+             "cmd_dc_open": False, "frames_seen": 0, "nvr_ip": None, "discovered": False}
     dumpf = open(VIDEO_DUMP, "wb"); framelog = open(FRAMES_LOG, "w")
 
     # Pick the Annex-B sink: ffmpeg->RTSP (go2rtc), stdout (pipe), or a dump file.
@@ -322,12 +331,32 @@ async def main():
             n = state.get("st1032", 0)
             if n < 12:
                 state["st1032"] = n + 1; log(f"status cmd1032 ch={chid} val={val}")
-        else:                                                # control responses (1351 params, 1003/1004 acks)
-            try: txt = payload.split(b"\x00")[0].decode("utf-8", "replace")[:220]
+        else:                                                # control responses (1351 params, 1003/1004 acks, 9100)
+            try: txt = payload.split(b"\x00")[0].decode("utf-8", "replace")
             except Exception: txt = ""
-            log(f"CTRL cmd={cmdid} link={link} len={len(buf)} {txt[:170]}")
-            framelog.write(json.dumps({"ctrl": True, "cmd": cmdid, "link": link, "len": len(buf), "txt": txt[:400]}) + "\n"); framelog.flush()
+            if DISCOVER and '"dev_list"' in txt and not state["discovered"]:
+                handle_devlist(txt)
+            else:
+                log(f"CTRL cmd={cmdid} link={link} len={len(buf)} {txt[:170]}")
+            framelog.write(json.dumps({"ctrl": True, "cmd": cmdid, "link": link, "len": len(buf), "txt": txt[:600]}) + "\n"); framelog.flush()
     oracle.on_frame = on_frame
+
+    def handle_devlist(txt):
+        try:
+            obj = json.loads(txt)
+        except Exception as e:
+            log("devlist parse err:", e); return
+        dl = obj.get("payload", {}).get("dev_list") or obj.get("dev_list") or []
+        cams = [{"channel": d.get("ch"), "name": d.get("name"), "sn": d.get("sn"),
+                 "status": d.get("status"), "dev_type": d.get("dev_type")} for d in dl]
+        manifest = {"nvr_sn": STATION_SN, "nvr_ip": state["nvr_ip"], "cameras": cams}
+        out = CAMERAS_JSON
+        json.dump(manifest, open(out, "w"), indent=2)
+        log(f"DISCOVERED nvr_ip={state['nvr_ip']} sn={STATION_SN}: {len(cams)} camera(s)")
+        for c in cams:
+            log(f"   ch {c['channel']}: {c['name']!r} (sn {c['sn']}, status {c['status']})")
+        log(f"wrote {out}")
+        state["discovered"] = True
 
     async def heartbeat_loop():
         ping = build_ping()
@@ -342,6 +371,11 @@ async def main():
             await asyncio.sleep(10)
 
     async def start_sequence():
+        if DISCOVER:
+            dl = build_devicelist(USER_ID)
+            log(f"-> getDeviceList (9100) len={len(dl)}  [auto-discovery]")
+            oracle.push_send(1, dl)
+            return
         # openLive (1103) param query, then the REAL trigger startStream (1003).
         ol = build_openlive(USER_ID, CHANNELS)
         log(f"-> openLive (1103) len={len(ol)} channels={CHANNELS}")
@@ -407,6 +441,9 @@ async def main():
 
         async def add_cand(cand):
             try:
+                p = cand.split()
+                if len(p) > 7 and p[6] == "typ" and p[7] == "host" and p[4].startswith("192.168.1.") and not state["nvr_ip"]:
+                    state["nvr_ip"] = p[4]   # the NVR's LAN IP (direct path) from its host ICE candidate
                 c = candidate_from_sdp(cand.split(":", 1)[1]); c.sdpMid = "2"; c.sdpMLineIndex = 0
                 await pc.addIceCandidate(c)
             except Exception as e: log("addIceCandidate err:", e)
@@ -445,7 +482,9 @@ async def main():
         try:
             async for raw in ws:
                 await handle(raw)
-                if not STREAM_MODE and state["vframes"] > 600:
+                if DISCOVER and state["discovered"]:
+                    log("discovery done; stopping."); break
+                if not STREAM_MODE and not DISCOVER and state["vframes"] > 600:
                     log("collected plenty of video; stopping."); break
         except Exception as e:
             log("ws loop err:", repr(e))

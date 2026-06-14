@@ -124,9 +124,13 @@ cd Eufy-Home-Assistant/bridge
 pip install -r requirements.txt        # Python deps (aiortc, etc.)
 node fetch_deps.js                     # downloads ffmpeg, go2rtc, and eufy's libsctp WASM (from eufy's CDN)
 node get_auth.js                       # one-time: log into the eufy web portal -> writes auth.json (gitignored)
+
+# Auto-discover the NVR IP + cameras (channel, name, online status) — no manual config:
+python eufy_stream.py --discover       # writes cameras.json
+python gen_go2rtc.py <BRIDGE_IP>       # generates go2rtc.yaml with friendly stream names (eufy_garage, ...)
 ```
 
-Edit `go2rtc.yaml` if your NVR isn't `192.168.1.152` or you want different channel names, then start it:
+Then start it:
 
 ```bash
 # Windows:  start_bridge.cmd          Linux:  ./start_bridge.sh

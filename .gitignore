@@ -1,6 +1,8 @@
 # Secrets — NEVER commit. These hold your eufy session token / account id.
 bridge/auth.json
 bridge/auth.local.json
+bridge/cameras.json
+bridge/go2rtc.yaml
 **/user_id.txt
 **/userdata/
 secrets.yaml
