@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.1
+
+- **Offline cameras no longer create dead "no feed" entities.** Discovery used to publish an
+  offline channel as a normal stream (the "offline" note was an inert comment), so the HA
+  integration made a green entity that 404'd on open. `gen_go2rtc.py` now skips status-0
+  cameras entirely; they're re-added automatically the next time discovery sees them online.
+- **Faster live-view open.** Shortened the transcode GOP from 25 to 12 frames. The feed runs
+  below 25 fps, so a keyframe now arrives every ~0.5-0.8s instead of ~1.5-2s, cutting the
+  per-open keyframe wait (on top of `keep_warm`, which removes the producer cold start).
+
 ## 0.5.0
 
 - **Live view now actually plays.** The bridge transcodes the NVR's HEVC to **H.264**

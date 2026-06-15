@@ -16,15 +16,21 @@ def slug(name, ch):
     return "eufy_" + (s or f"ch{ch}")
 
 named = [(slug(c["name"], c["channel"]), c) for c in cams["cameras"]]
+# Only publish ONLINE cameras. An offline channel (status 0) has no producer, so emitting it
+# created a dead go2rtc stream -> the HA integration made a green entity that 404s on open
+# ("provisioned but no feed"). When the camera comes back, the next discovery re-adds it.
+online = [(name, c) for name, c in named if c.get("status") != 0]
+offline = [name for name, c in named if c.get("status") == 0]
+if offline:
+    print("skipping OFFLINE camera(s) (no stream/entity until they're back online):", ", ".join(offline))
 
-lines = [f'# Auto-generated from cameras.json (eufy NVR {cams.get("nvr_sn","")}). On-demand streams.', "streams:"]
-for name, c in named:
-    note = "  # offline at discovery" if c.get("status") == 0 else ""
-    lines.append(f"  {name}: \"exec:python eufy_stream.py {c['channel']} --rtsp {{output}}\"{note}")
+lines = [f'# Auto-generated from cameras.json (eufy NVR {cams.get("nvr_sn","")}). Online cameras only; on-demand streams.', "streams:"]
+for name, c in online:
+    lines.append(f"  {name}: \"exec:python eufy_stream.py {c['channel']} --rtsp {{output}}\"")
 lines += ["", "rtsp:", '  listen: ":8554"', "", "api:", '  listen: ":1984"', "", "log:", "  level: info", ""]
 open(os.path.join(ROOT, "go2rtc.yaml"), "w").write("\n".join(lines))
-print("wrote", os.path.join(ROOT, "go2rtc.yaml"))
+print("wrote", os.path.join(ROOT, "go2rtc.yaml"), f"({len(online)} online cameras)")
 
 print("\n# --- paste into Home Assistant /config/go2rtc.yaml (set BRIDGE_IP) ---\nstreams:")
-for name, c in named:
+for name, c in online:
     print(f"  {name}:\n  - rtsp://{BRIDGE_IP}:8554/{name}")

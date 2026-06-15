@@ -288,10 +288,11 @@ async def main():
             vcodec = ["-c:v", "copy"]
             _codec_label = "H.265 (copy)"
         else:
-            # short GOP (keyframe ~every 1s) so a NEW consumer (HA opening live view) gets an
-            # IDR almost immediately instead of waiting a full GOP; zerolatency drops B-frames.
+            # short GOP so a NEW consumer (HA opening live view) gets an IDR fast instead of
+            # waiting a full GOP. The feed runs <25fps, so g=12 => a keyframe every ~0.5-0.8s
+            # (g=25 was ~1.5-2s of keyframe-wait per open). zerolatency drops B-frames.
             vcodec = ["-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency",
-                      "-pix_fmt", "yuv420p", "-g", "25", "-keyint_min", "25", "-sc_threshold", "0"]
+                      "-pix_fmt", "yuv420p", "-g", "12", "-keyint_min", "12", "-sc_threshold", "0"]
             _codec_label = "H.264 (transcoded)"
         ffmpeg_proc = await asyncio.create_subprocess_exec(
             FFMPEG, "-hide_banner", "-loglevel", "warning", "-fflags", "nobuffer",
