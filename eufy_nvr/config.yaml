@@ -60,7 +60,7 @@ options:
 schema:
   email: str
   password: password
-  region: list(US|EU)?
+  region: list(US|EU|IE)?
   log_level: list(trace|debug|info|notice|warning|error|fatal)?
   # keep_warm: hold each online camera warm so HA live-view opens instantly (no 5-13s cold start).
   #   DEFAULT OFF: it costs one continuous H.264 transcode per online camera -> only enable on a
