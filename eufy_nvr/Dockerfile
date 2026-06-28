@@ -63,7 +63,7 @@ RUN if [ ! -e /usr/bin/python ]; then ln -s /usr/bin/python3 /usr/bin/python; fi
 # so the bridge is vendored from the repo at build time. Pinned to a tag/branch
 # keeps the image reproducible; bump on release.
 # ---------------------------------------------------------------------------
-ARG REPO_URL="https://github.com/HallyAus/Eufy-Home-Assistant"
+ARG REPO_URL="https://github.com/jharrisuk/Eufy-Home-Assistant"
 ARG REPO_REF="main"
 RUN git clone --depth 1 --branch "${REPO_REF}" "${REPO_URL}" /tmp/repo \
     && mkdir -p /opt/eufy \
