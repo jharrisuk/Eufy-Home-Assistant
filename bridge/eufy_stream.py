@@ -36,12 +36,17 @@ def _broad_ssl_ctx(self, srtp_profiles):
 _RTCCert._create_ssl_context = _broad_ssl_ctx
 
 ROOT = os.path.dirname(os.path.abspath(__file__))   # the bridge/ directory
+
 def _bin(name):
     exe = name + (".exe" if os.name == "nt" else "")
     local = os.path.join(ROOT, "bin", exe)
     return os.environ.get(name.upper(), local if os.path.exists(local) else name)
+
+AUTH = json.load(open(os.environ.get("EUFY_AUTH", os.path.join(ROOT, "auth.json"))))
+STATION_SN = os.environ.get("EUFY_STATION_SN") or AUTH.get("stationSn") or "T8N005102610052C"
+
 WEB_COUNTRY = (AUTH.get("webCountry") or os.environ.get("EUFY_REGION") or "US").strip().upper()
-BACKEND_REGION = {"UK": "IE", "GB": "IE"}.get(WEB_COUNTRY, WEB_COUNTRY)
+WEB_COUNTRY = {"UK": "IE", "GB": "IE"}.get(WEB_COUNTRY, WEB_COUNTRY)
 
 SMART_HOSTS = {
     "US": "security-smart.eufylife.com",
@@ -49,10 +54,7 @@ SMART_HOSTS = {
     "IE": "security-smart-ie.eufylife.com",
 }
 
-SMART_HOST = SMART_HOSTS.get(BACKEND_REGION, SMART_HOSTS["US"])
-
-AUTH = json.load(open(os.environ.get("EUFY_AUTH", os.path.join(ROOT, "auth.json"))))
-STATION_SN = os.environ.get("EUFY_STATION_SN") or AUTH.get("stationSn") or "T8N005102610052C"
+SMART_HOST = SMART_HOSTS.get(WEB_COUNTRY, SMART_HOSTS["US"])
 
 def _decrypt_user_id():
     if AUTH.get("userId"):
@@ -68,14 +70,17 @@ def _decrypt_user_id():
         prev = hashlib.md5(prev + b"aes" + salt).digest(); d += prev
     pt = AES.new(d[:32], AES.MODE_CBC, d[32:48]).decrypt(ct)
     return json.loads(pt[:-pt[-1]])
+
 USER_ID = _decrypt_user_id()
 DISCOVER = "--discover" in sys.argv   # connect, run cmd 9100 -> list NVR ip + cameras (ch,name), write cameras.json, exit
 _carg = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else "0"
 CHANNELS = [0, 1, 2, 3] if _carg == "all" else [int(x) for x in _carg.split(",")]
+
 # --rtsp <url>: publish the H.265 stream to that RTSP url via ffmpeg (go2rtc exec {output} mode).
 RTSP_URL = None
 if "--rtsp" in sys.argv:
     RTSP_URL = sys.argv[sys.argv.index("--rtsp") + 1]
+
 STREAM_MODE = bool(RTSP_URL) or os.environ.get("EUFY_STDOUT") == "1"   # run indefinitely, no frame-count stop
 _rest = [a for a in sys.argv[2:] if a not in ("--rtsp", RTSP_URL)]
 RUN_SECS = int(_rest[0]) if _rest and _rest[0].isdigit() else (10**9 if STREAM_MODE else 70)
@@ -85,14 +90,20 @@ FFMPEG = _bin("ffmpeg")
 
 WS_URL = f"wss://{SMART_HOST}/v1/rtc/ws/join?reqtype=nvr"
 SIGN_URL = f"https://{SMART_HOST}/v1/smart/nvr/ws/sign?station_sn={STATION_SN}"
+
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
 HEADERS = {
-    "x-auth-token": AUTH["authToken"], "gtoken": AUTH["gtoken"],
-    "app-name": AUTH.get("appName", "eufy_mega"), "model-type": "WEB",
+    "x-auth-token": AUTH["authToken"],
+    "gtoken": AUTH["gtoken"],
+    "app-name": AUTH.get("appName", "eufy_mega"),
+    "model-type": "WEB",
     "web-country": WEB_COUNTRY,
-    "accept": "application/json, text/plain, */*", "user-agent": UA,
-    "origin": "https://security.eufy.com", "referer": "https://security.eufy.com/",
+    "accept": "application/json, text/plain, */*",
+    "user-agent": UA,
+    "origin": "https://security.eufy.com",
+    "referer": "https://security.eufy.com/",
 }
+
 os.makedirs(os.path.join(ROOT, "_debug"), exist_ok=True)
 VIDEO_DUMP = os.path.join(ROOT, "_debug", "video_dump.bin")
 FRAMES_LOG = os.path.join(ROOT, "_debug", "frames.jsonl")
