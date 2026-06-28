@@ -172,8 +172,18 @@ def build_ping():
 async def get_sign_token():
     async with aiohttp.ClientSession() as s:
         async with s.get(SIGN_URL, headers=HEADERS) as r:
-            txt = await r.text(); log("ws/sign", r.status, txt[:120])
-            return json.loads(txt)["data"]
+            txt = await r.text()
+            log("ws/sign", r.status, SIGN_URL, txt[:120])
+
+            try:
+                payload = json.loads(txt)
+            except Exception:
+                raise RuntimeError(f"ws/sign returned non-JSON response: HTTP {r.status} {txt[:300]}")
+
+            if r.status != 200 or "data" not in payload:
+                raise RuntimeError(f"ws/sign failed: HTTP {r.status} {payload}")
+
+            return payload["data"]
 
 def colonize(fp): return ":".join(fp[i:i+2] for i in range(0, len(fp), 2))
 
