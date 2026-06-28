@@ -1,5 +1,5 @@
 name: Eufy NVR Local IE/UK patch (experimental)
-version: "0.5.3"
+version: "0.5.4"
 slug: eufy_nvr_ie
 description: Local live video from a eufy PoE NVR (S4 / T8N00) over reversed WebRTC, served as RTSP/WebRTC for Home Assistant. No cloud media, no Frigate.
 url: https://github.com/HallyAus/Eufy-Home-Assistant
@@ -52,7 +52,7 @@ ports_description:
 options:
   email: ""
   password: ""
-  region: "US"
+  region: "IE"
   log_level: "info"
   keep_warm: false
   token_refresh_hours: 6
@@ -60,7 +60,7 @@ options:
 schema:
   email: str
   password: password
-  region: list(US|EU|IE)?
+  region: list(US|EU|UK/IE)?
   log_level: list(trace|debug|info|notice|warning|error|fatal)?
   # keep_warm: hold each online camera warm so HA live-view opens instantly (no 5-13s cold start).
   #   DEFAULT OFF: it costs one continuous H.264 transcode per online camera -> only enable on a
