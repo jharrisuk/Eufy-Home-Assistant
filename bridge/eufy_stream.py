@@ -40,6 +40,16 @@ def _bin(name):
     exe = name + (".exe" if os.name == "nt" else "")
     local = os.path.join(ROOT, "bin", exe)
     return os.environ.get(name.upper(), local if os.path.exists(local) else name)
+WEB_COUNTRY = (AUTH.get("webCountry") or os.environ.get("EUFY_REGION") or "US").strip().upper()
+BACKEND_REGION = {"UK": "IE", "GB": "IE"}.get(WEB_COUNTRY, WEB_COUNTRY)
+
+SMART_HOSTS = {
+    "US": "security-smart.eufylife.com",
+    "EU": "security-smart-eu.eufylife.com",
+    "IE": "security-smart-ie.eufylife.com",
+}
+
+SMART_HOST = SMART_HOSTS.get(BACKEND_REGION, SMART_HOSTS["US"])
 
 AUTH = json.load(open(os.environ.get("EUFY_AUTH", os.path.join(ROOT, "auth.json"))))
 STATION_SN = os.environ.get("EUFY_STATION_SN") or AUTH.get("stationSn") or "T8N005102610052C"
@@ -73,13 +83,13 @@ NODE = _bin("node")
 ORACLE = os.path.join(ROOT, "sctp_oracle.js")
 FFMPEG = _bin("ffmpeg")
 
-WS_URL = "wss://security-smart.eufylife.com/v1/rtc/ws/join?reqtype=nvr"
-SIGN_URL = f"https://security-smart.eufylife.com/v1/smart/nvr/ws/sign?station_sn={STATION_SN}"
+WS_URL = f"wss://{SMART_HOST}/v1/rtc/ws/join?reqtype=nvr"
+SIGN_URL = f"https://{SMART_HOST}/v1/smart/nvr/ws/sign?station_sn={STATION_SN}"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
 HEADERS = {
     "x-auth-token": AUTH["authToken"], "gtoken": AUTH["gtoken"],
     "app-name": AUTH.get("appName", "eufy_mega"), "model-type": "WEB",
-    "web-country": AUTH.get("webCountry", "US"),
+    "web-country": WEB_COUNTRY,
     "accept": "application/json, text/plain, */*", "user-agent": UA,
     "origin": "https://security.eufy.com", "referer": "https://security.eufy.com/",
 }
@@ -267,7 +277,7 @@ async def main():
 
     oracle = Oracle(); await oracle.start()
 
-    sub = {"region": AUTH.get("webCountry", "US"), "type": "NVR", "sn": STATION_SN,
+   sub = {"region": WEB_COUNTRY, "type": "NVR", "sn": STATION_SN,
            "token": AUTH["authToken"], "gtoken": AUTH["gtoken"], "sign": sign_token,
            "appName": AUTH.get("appName", "eufy_mega"), "modelType": "WEB"}
     subproto = base64.urlsafe_b64encode(json.dumps(sub, separators=(",", ":")).encode()).decode().rstrip("=")
