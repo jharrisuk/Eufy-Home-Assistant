@@ -288,9 +288,16 @@ async def main():
 
     oracle = Oracle(); await oracle.start()
 
-   sub = {"region": WEB_COUNTRY, "type": "NVR", "sn": STATION_SN,
-           "token": AUTH["authToken"], "gtoken": AUTH["gtoken"], "sign": sign_token,
-           "appName": AUTH.get("appName", "eufy_mega"), "modelType": "WEB"}
+    sub = {
+        "region": WEB_COUNTRY,
+        "type": "NVR",
+        "sn": STATION_SN,
+        "token": AUTH["authToken"],
+        "gtoken": AUTH["gtoken"],
+        "sign": sign_token,
+        "appName": AUTH.get("appName", "eufy_mega"),
+        "modelType": "WEB",
+    }
     subproto = base64.urlsafe_b64encode(json.dumps(sub, separators=(",", ":")).encode()).decode().rstrip("=")
 
     pc = RTCPeerConnection(RTCConfiguration(iceServers=[]))
