@@ -8,7 +8,7 @@ engine needs, and writes auth.json in the shape eufy_stream.py expects.
 
 Env in:
   EUFY_EMAIL, EUFY_PASSWORD              required
-  EUFY_REGION                            "US" | "EU" (default US)
+  EUFY_REGION                            "US" | "EU" | "IE" (default US)
   EUFY_STATION_SN                        optional override / fallback
   EUFY_CAPTCHA_ID, EUFY_CAPTCHA_ANSWER   optional, if a prior run reported a captcha
   EUFY_AUTH                              output path (default <bridge>/auth.json)
