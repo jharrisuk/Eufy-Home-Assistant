@@ -61,7 +61,9 @@ async def main() -> int:
         print("auth_login: EUFY_EMAIL / EUFY_PASSWORD not set", file=sys.stderr)
         return 2
     region_opt = (os.environ.get("EUFY_REGION") or "US").strip().upper()
+    region_opt = {"UK": "IE", "GB": "IE"}.get(region_opt, region_opt)
     region = REGION_MAP.get(region_opt, "us-pr")
+
     country = region_opt if region_opt in ("US", "EU", "IE") else "US"
 
     try:
@@ -101,7 +103,7 @@ async def main() -> int:
         "gtoken": gtoken,
         "userId": user_id,
         "stationSn": station_sn,
-        "webCountry": country if country in ("US", "EU") else "US",
+        "webCountry": country if country in ("US", "EU", "IE") else "US",
         "appName": "eufy_mega",
     }
     old = os.umask(0o077)
